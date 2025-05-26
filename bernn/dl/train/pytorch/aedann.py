@@ -54,6 +54,9 @@ class Classifier(nn.Module):
         if n_layers == 2:
             self.linear2 = nn.Sequential(
                 nn.Linear(in_shape, in_shape),
+                nn.BatchNorm1d(in_shape),
+                nn.Dropout(),
+                nn.ReLU(),
             )
             self.linear3 = nn.Sequential(
                 nn.Linear(in_shape, out_shape),
@@ -90,7 +93,7 @@ class Classifier(nn.Module):
 
 
 class Classifier2(nn.Module):
-    def __init__(self, in_shape: int = 64, hidden: int = 64, out_shape: int = 9) -> None:
+    def __init__(self, in_shape: int = 64, hidden: int = 128, out_shape: int = 9) -> None:
         super(Classifier2, self).__init__()
         self.linear1 = nn.Sequential(
             nn.Linear(in_shape, hidden),
@@ -209,7 +212,7 @@ class Encoder3(nn.Module):
         prev_size = in_shape
 
         # Add all layers except the last one
-        for layer_size in layers[:-1]:
+        for layer_size in list(layers.values())[:-1]:
             self.layers.append(nn.Sequential(
                 nn.Linear(prev_size, layer_size),
                 nn.BatchNorm1d(layer_size),
@@ -220,8 +223,8 @@ class Encoder3(nn.Module):
 
         # Add the final layer without activation
         self.layers.append(nn.Sequential(
-            nn.Linear(prev_size, layers[-1]),
-            nn.BatchNorm1d(layers[-1]),
+            nn.Linear(prev_size, layers[list(layers.keys())[-1]]),
+            # nn.BatchNorm1d(layers[list(layers.keys())[-1]]),
         ))
 
         self.random_init()
@@ -337,49 +340,46 @@ class Decoder3(nn.Module):
         device (str, optional): Device to use ('cuda' or 'cpu'). Defaults to 'cuda'.
     """
 
-    def __init__(self, in_shape: int, layers: dict, n_batches: int,
+    def __init__(self, in_shape: int, n_batches: int, layers: dict,
                  dropout: float, device: str = 'cuda'):
         super(Decoder3, self).__init__()
 
         # Build the network layers
         self.layers = nn.ModuleDict()
-        prev_size = in_shape
+        prev_size = list(layers.values())[-1]
 
         # Add all layers except the last one
-        for layer_name, layer_config in list(layers.items())[:-1]:
-            layer_size = layer_config['size']
-            layer_dropout = layer_config.get('dropout', dropout)
-
+        for layer_name, layer_size in list(layers.items())[::-1]:
+            if layer_name == list(layers.keys())[-1]:
+                continue
             # If we have batch information, add it to the input size
             if n_batches > 0:
                 self.layers[layer_name] = nn.Sequential(
                     nn.Linear(prev_size + n_batches, layer_size),
                     nn.BatchNorm1d(layer_size),
-                    nn.Dropout(layer_dropout),
+                    nn.Dropout(dropout),
                     nn.ReLU(),
                 )
             else:
                 self.layers[layer_name] = nn.Sequential(
                     nn.Linear(prev_size, layer_size),
                     nn.BatchNorm1d(layer_size),
-                    nn.Dropout(layer_dropout),
+                    nn.Dropout(dropout),
                     nn.ReLU(),
                 )
             prev_size = layer_size
 
         # Add the final layer without activation
-        final_layer_name = list(layers.keys())[-1]
-        final_layer_size = layers[final_layer_name]['size']
-        if n_batches > 0:
-            self.layers[final_layer_name] = nn.Sequential(
-                nn.Linear(prev_size + n_batches, final_layer_size),
-                nn.BatchNorm1d(final_layer_size),
-            )
-        else:
-            self.layers[final_layer_name] = nn.Sequential(
-                nn.Linear(prev_size, final_layer_size),
-                nn.BatchNorm1d(final_layer_size),
-            )
+        self.layers[list(layers.keys())[-1]] = nn.Sequential(
+            nn.Linear(prev_size, in_shape),
+            # nn.BatchNorm1d(in_shape),
+        )
+
+        # Create a new ModuleDict with reversed order
+        # reversed_layers = nn.ModuleDict()
+        # for key in reversed(list(self.layers.keys())):
+        #     reversed_layers[key] = self.layers[key]
+        # self.layers = reversed_layers
 
         self.n_batches = n_batches
         self.random_init()
@@ -392,7 +392,7 @@ class Decoder3(nn.Module):
             batches (torch.Tensor, optional): Batch information tensor of shape (batch_size, n_batches)
 
         Returns:
-            torch.Tensor: Decoded representation of shape (batch_size, layers[-1]['size'])
+            torch.Tensor: Decoded representation of shape (batch_size, layers[-1])
         """
         for layer in self.layers.values():
             if self.n_batches > 0 and batches is not None:
@@ -416,7 +416,7 @@ class Decoder3(nn.Module):
 class SHAPAutoEncoder2(nn.Module):
     def __init__(self, in_shape: int, n_batches: int, nb_classes: int, n_emb: int,
                  n_meta: int, mapper: bool, variational: bool, layer1: int, layer2: int,
-                 dropout: float, n_layers: int, zinb: bool = False, conditional: bool = False,
+                 dropout: float, n_layers: int, zinb: bool = False, conditional: bool = True,
                  add_noise: bool = False, tied_weights: int = 0, use_gnn: bool = False,
                  device: str = 'cuda') -> None:
         super(SHAPAutoEncoder2, self).__init__()
@@ -556,7 +556,7 @@ class SHAPAutoEncoder2(nn.Module):
         return result
 
 
-class SHAPAutoencoder3(nn.Module):
+class SHAPAutoEncoder3(nn.Module):
     """A flexible SHAP autoencoder network with batch normalization and dropout.
 
     This autoencoder consists of multiple linear layers with batch normalization and dropout
@@ -585,9 +585,9 @@ class SHAPAutoencoder3(nn.Module):
 
     def __init__(self, in_shape: int, n_batches: int, nb_classes: int, n_emb: int, n_meta: int,
                  mapper: bool, variational: bool, layers: dict, dropout: float, n_layers: int,
-                 zinb: bool = False, conditional: bool = False, add_noise: bool = False,
+                 zinb: bool = False, conditional: bool = True, add_noise: bool = False,
                  tied_weights: int = 0, use_gnn: bool = False, device: str = 'cuda'):
-        super(SHAPAutoencoder3, self).__init__()
+        super(SHAPAutoEncoder3, self).__init__()
         self.n_emb = n_emb
         self.add_noise = add_noise
         self.n_meta = n_meta
@@ -607,23 +607,23 @@ class SHAPAutoencoder3(nn.Module):
             self.dec = Decoder3(in_shape + n_meta, 0, layers, dropout, device)
 
         # Create mapper for batch effect removal
-        self.mapper = Classifier(n_batches + 1, layers[-1]['size'])
+        self.mapper = Classifier(n_batches + 1, layers[list(layers.keys())[-1]])
 
         # Create variational sampling if needed
         if variational:
-            self.gaussian_sampling = GaussianSample(layers[-1]['size'], layers[-1]['size'], device)
+            self.gaussian_sampling = GaussianSample(layers[list(layers.keys())[-1]], layers[list(layers.keys())[-1]], device)
         else:
             self.gaussian_sampling = None
 
         # Create discriminator and classifier
-        self.dann_discriminator = Classifier2(layers[-1]['size'], 64, n_batches)
-        self.classifier = Classifier(layers[-1] + n_emb, nb_classes, n_layers=n_layers)
+        self.dann_discriminator = Classifier2(layers[list(layers.keys())[-1]], 64, n_batches)
+        self.classifier = Classifier(layers[list(layers.keys())[-1]] + n_emb, nb_classes, n_layers=n_layers)
 
         # Create ZINB-specific layers if needed
         if zinb:
-            self._dec_mean = nn.Sequential(nn.Linear(layers[-2]['size'], in_shape + n_meta), MeanAct())
-            self._dec_disp = nn.Sequential(nn.Linear(layers[-2]['size'], in_shape + n_meta), DispAct())
-            self._dec_pi = nn.Sequential(nn.Linear(layers[-2]['size'], in_shape + n_meta), nn.Sigmoid())
+            self._dec_mean = nn.Sequential(nn.Linear(layers[list(layers.keys())[-2]], in_shape + n_meta), MeanAct())
+            self._dec_disp = nn.Sequential(nn.Linear(layers[list(layers.keys())[-2]], in_shape + n_meta), DispAct())
+            self._dec_pi = nn.Sequential(nn.Linear(layers[list(layers.keys())[-2]], in_shape + n_meta), nn.Sigmoid())
 
         self.random_init(nn.init.xavier_uniform_)
 
@@ -802,7 +802,7 @@ class AutoEncoder2(nn.Module):
     def __init__(self, in_shape: int, n_batches: int, nb_classes: int, n_meta: int,
                  n_emb: int, mapper: bool, variational: bool, layer1: int, layer2: int,
                  dropout: float, n_layers: int, prune_threshold: float, zinb: bool = False,
-                 conditional: bool = False, add_noise: bool = False, tied_weights: int = 0,
+                 conditional: bool = True, add_noise: bool = False, tied_weights: int = 0,
                  update_grid: bool = False, use_gnn: bool = False, device: str = 'cuda') -> None:
         """
         TODO MAKE DESCRIPTION
@@ -896,12 +896,25 @@ class AutoEncoder2(nn.Module):
 
     def prune_model_paperwise(self, is_classification: bool, is_dann: bool,
                               weight_threshold: float = 0) -> int:
-        print("Pruning not available for this model")
+        n_neurons = self.count_n_neurons()
         # TODO implement pruning or count the number of neurons
-        return 0
+        return n_neurons
 
     def count_n_neurons(self) -> int:
-        return 0
+        total = 0
+        layer_counts = {}
+
+        for name, module in self.named_modules():
+            if isinstance(module, nn.Linear):
+                # Try to exclude final output layers based on naming or shape
+                if 'classifier' in name and module.out_features <= 10:  # likely classification output
+                    continue
+                if 'dec' in name and module.out_features == self._dec_mean[0].out_features:
+                    continue
+                layer_counts[name] = module.out_features
+                total += module.out_features
+
+        return {"total": total, "layers": layer_counts}
 
     def random_init(self, init_func: Any = nn.init.kaiming_uniform_) -> None:
         for m in self.modules():
@@ -986,7 +999,7 @@ class AutoEncoder3(nn.Module):
     def __init__(self, in_shape: int, n_batches: int, nb_classes: int, n_meta: int,
                  n_emb: int, mapper: bool, variational: bool, layers: dict,
                  dropout: float, n_layers: int, prune_threshold: float, zinb: bool = False,
-                 conditional: bool = False, add_noise: bool = False, tied_weights: int = 0,
+                 conditional: bool = True, add_noise: bool = False, tied_weights: int = 0,
                  update_grid: bool = False, use_gnn: bool = False, device: str = 'cuda') -> None:
         """
         TODO MAKE DESCRIPTION
@@ -1006,17 +1019,18 @@ class AutoEncoder3(nn.Module):
             self.dec = Decoder3(in_shape + n_meta, n_batches, layers, dropout, device)
         else:
             self.dec = Decoder3(in_shape + n_meta, 0, layers, dropout, device)
-        self.mapper = Classifier(n_batches + 1, layers[-1]['size'])
+        self.mapper = Classifier(n_batches + 1, layers[list(layers.keys())[-1]])
 
         if variational:
-            self.gaussian_sampling = GaussianSample(layers[-1]['size'], layers[-1]['size'], device)
+            self.gaussian_sampling = GaussianSample(layers[list(layers.keys())[-1]], layers[list(layers.keys())[-1]], device)
         else:
             self.gaussian_sampling = None
-        self.dann_discriminator = Classifier2(layers[-1]['size'], 64, n_batches)
-        self.classifier = Classifier(layers[-1]['size'] + n_emb, nb_classes, n_layers=n_layers)
-        self._dec_mean = nn.Sequential(nn.Linear(layers[-2]['size'], in_shape + n_meta), MeanAct())
-        self._dec_disp = nn.Sequential(nn.Linear(layers[-2]['size'], in_shape + n_meta), DispAct())
-        self._dec_pi = nn.Sequential(nn.Linear(layers[-2]['size'], in_shape + n_meta), nn.Sigmoid())
+        self.dann_discriminator = Classifier2(layers[list(layers.keys())[-1]], 128, n_batches)
+        self.classifier = Classifier2(layers[list(layers.keys())[-1]] + n_emb, 128, nb_classes)
+        if zinb:
+            self._dec_mean = nn.Sequential(nn.Linear(layers[list(layers.keys())[-2]], in_shape + n_meta), MeanAct())
+            self._dec_disp = nn.Sequential(nn.Linear(layers[list(layers.keys())[-2]], in_shape + n_meta), DispAct())
+            self._dec_pi = nn.Sequential(nn.Linear(layers[list(layers.keys())[-2]], in_shape + n_meta), nn.Sigmoid())
         self.random_init(nn.init.kaiming_uniform_)
 
     def forward(self, x: torch.Tensor, to_rec: torch.Tensor,
@@ -1085,7 +1099,20 @@ class AutoEncoder3(nn.Module):
         return 0
 
     def count_n_neurons(self) -> int:
-        return 0
+        total = 0
+        layer_counts = {}
+
+        for name, module in self.named_modules():
+            if isinstance(module, nn.Linear):
+                # Try to exclude final output layers based on naming or shape
+                if 'classifier' in name and module.out_features <= 10:  # likely classification output
+                    continue
+                if 'dec' in name and module.out_features == self._dec_mean[0].out_features:
+                    continue
+                layer_counts[name] = module.out_features
+                total += module.out_features
+
+        return {"total": total, "layers": layer_counts}
 
     def random_init(self, init_func: Any = nn.init.kaiming_uniform_) -> None:
         for m in self.modules():
@@ -1098,10 +1125,12 @@ class AutoEncoder3(nn.Module):
             #     nn.init.constant_(m.bias, 0.125)
 
     def predict_proba(self, x: torch.Tensor) -> np.ndarray:
-        return self.classifier(x).detach().cpu().numpy()
+        enc = self.enc(x)
+        return self.classifier(enc).detach().cpu().numpy()
 
     def predict(self, x: torch.Tensor) -> np.ndarray:
-        return self.classifier(x).argmax(1).detach().cpu().numpy()
+        enc = self.enc(x)
+        return self.classifier(enc).argmax(1).detach().cpu().numpy()
 
     def _kld(self, z: torch.Tensor, q_param: Tuple[torch.Tensor, torch.Tensor],
              h_last: Optional[torch.Tensor] = None,

@@ -4,7 +4,7 @@ This package provides tools for removing batch effects from mass spectrometry da
 using deep learning approaches.
 """
 
-__version__ = "0.1.15"
+__version__ = "0.1.18"
 __author__ = "Simon Pelletier"
 __license__ = "MIT"
 
@@ -21,6 +21,8 @@ from .dl.models.pytorch import (
     SHAPAutoEncoder2,
     KANAutoencoder2,
     SHAPKANAutoencoder2,
+    AutoEncoder3,
+    SHAPAutoEncoder3,
 )
 
 # KAN modules
@@ -37,6 +39,8 @@ __all__ = [
     "SHAPAutoEncoder2",
     "KANAutoencoder2",
     "SHAPKANAutoencoder2",
+    "AutoEncoder3",
+    "SHAPAutoEncoder3",
 
     # KAN
     "KANLinear",

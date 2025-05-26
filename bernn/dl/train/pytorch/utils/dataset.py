@@ -48,7 +48,8 @@ class MSDataset3(Dataset):
         self.random_recs = random_recs
         try:
             self.samples = data.to_numpy()
-        except:
+        except Exception as e:
+            print(f"Error in samples: {e}")
             self.samples = data
 
         self.add_noise = add_noise
@@ -58,7 +59,7 @@ class MSDataset3(Dataset):
         self.transform = transform
         self.crop_size = crop_size
         self.labels = labels
-        self.unique_labels = list(set(labels))
+        self.unique_labels = np.unique(labels)
         self.batches = batches
         self.unique_batches = np.unique(batches)
         labels_inds = {label: [i for i, x in enumerate(labels) if x == label] for label in self.unique_labels}
@@ -69,17 +70,21 @@ class MSDataset3(Dataset):
             self.labels_meta_data = {label: meta.iloc[labels_inds[label]].to_numpy() for label in labels}
             self.batches_data = {batch: data.iloc[batches_inds[batch]].to_numpy() for batch in batches}
             self.batches_meta_data = {batch: meta.iloc[batches_inds[batch]].to_numpy() for batch in batches}
-        except:
+        except Exception as e:
+            print(f"Error in labels_data: {e}")
             self.labels_data = {label: data[labels_inds[label]] for label in labels}
             self.labels_meta_data = {label: meta[labels_inds[label]] for label in labels}
             self.batches_data = {batch: data[batches_inds[batch]] for batch in batches}
             self.batches_meta_data = {batch: meta[batches_inds[batch]] for batch in batches}
 
-        # except:
-        #     print(labels)
         self.n_labels = {label: len(self.labels_data[label]) for label in labels}
         self.n_batches = {batch: len(self.batches_data[batch]) for batch in batches}
         self.triplet_dloss = triplet_dloss
+
+        if type(self.labels[0]) == str:
+            self.labels = np.array([np.argwhere(label == self.unique_labels).item() for label in self.labels])
+        if type(self.batches[0]) == str:
+            self.batches = np.array([np.argwhere(batch == self.unique_batches).item() for batch in self.batches])
 
     def __len__(self):
         return len(self.samples)
@@ -89,15 +94,24 @@ class MSDataset3(Dataset):
         if self.labels is not None:
             label = self.labels[idx]
             batch = self.batches[idx]
-            set = self.sets[idx]
+            if len(self.sets) > 0:
+                set = self.sets[idx]
+            else:
+                set = 'unknown'
+            # TODO This should not be necessary to test the type, should always be one or the other
             try:
-                name = self.names[idx]
-            except:
-                name = str(self.names.iloc[idx])
-            try:
-                meta_to_rec = self.meta[idx]
-            except:
+                if type(self.names) == pd.Series:
+                    name = self.names.iloc[idx]
+                else:
+                    name = str(self.names[idx])
+            except Exception as e:
+                print(f"Error in names: {e}")
+                name = str(self.names[idx])
+            # TODO This should not be necessary to test the type, should always be one or the other
+            if type(self.meta) == pd.DataFrame:
                 meta_to_rec = self.meta.iloc[idx].to_numpy()
+            else:
+                meta_to_rec = self.meta[idx]
 
         else:
             label = None
@@ -189,7 +203,8 @@ def load_checkpoint(checkpoint_path,
     try:
         losses_recon = checkpoint_dict['losses_recon']
         kl_divs = checkpoint_dict['kl_divs']
-    except:
+    except Exception as e:
+        print(f"Error in loading checkpoint: {e}")
         losses_recon = None
         kl_divs = None
 
@@ -1027,18 +1042,20 @@ def get_loaders_bacteria(data, random_recs, samples_weights, triplet_dloss, ae=N
     """
     transform = torchvision.transforms.Compose([
         torchvision.transforms.ToTensor(),
-        # torchvision.transforms.Normalize(0.5, 0.5),
+        torchvision.transforms.Normalize(0.5, 0.5),
     ])
 
-    train_set = MSDataset3(data['inputs']['train'], data['meta']['train'], data['names']['train'],
-                           data['cats']['train'], [x for x in data['batches']['train']], sets=data['sets']['all'],
+    train_set = MSDataset3(data['inputs']['train'], data['meta']['train'],
+                           data['names']['train'], data['cats']['train'],
+                           [x for x in data['batches']['train']], sets=data['sets']['all'],
                            transform=transform, crop_size=-1, random_recs=random_recs, triplet_dloss=triplet_dloss)
     valid_set = MSDataset3(data['inputs']['valid'], data['meta']['valid'], data['names']['valid'],
                            data['cats']['valid'], [x for x in data['batches']['valid']], sets=data['sets']['valid'],
                            transform=transform, crop_size=-1, random_recs=False, triplet_dloss=triplet_dloss)
-    upos_set = MSDataset3(data['inputs']['urinespositives'], data['meta']['urinespositives'], data['names']['urinespositives'],
-                         data['cats']['urinespositives'], [x for x in data['batches']['urinespositives']], sets=data['sets']['urinespositives'],
-                         transform=transform, crop_size=-1, random_recs=False, triplet_dloss=triplet_dloss)
+    upos_set = MSDataset3(data['inputs']['urinespositives'], data['meta']['urinespositives'],
+                          data['names']['urinespositives'], data['cats']['urinespositives'],
+                          [x for x in data['batches']['urinespositives']], sets=data['sets']['urinespositives'],
+                          transform=transform, crop_size=-1, random_recs=False, triplet_dloss=triplet_dloss)
     valid_set2 = MSDataset3(data['inputs']['valid'], data['meta']['valid'], data['names']['valid'],
                             data['cats']['valid'], [x for x in data['batches']['valid']], sets=data['sets']['valid'],
                             transform=transform, crop_size=-1, random_recs=False, triplet_dloss=triplet_dloss)
@@ -1236,7 +1253,8 @@ class MSCSV:
             try:
                 mat_data = transforms.Resize((self.new_size, self.new_size))(
                 torch.Tensor(mat_data.values).unsqueeze(0)).squeeze().detach().cpu().numpy()
-            except:
+            except Exception as e:
+                print(f"Error in {fname}: {e}")
                 mat_data = transforms.Resize((self.new_size, self.new_size))(
                 torch.Tensor(mat_data).unsqueeze(0)).squeeze().detach().cpu().numpy()
 
@@ -1316,14 +1334,13 @@ class MS2CSV:
                 try:
                     mat_data = transforms.Resize((self.new_size, self.new_size))(
                     torch.Tensor(mat_data.values).unsqueeze(0)).squeeze().detach().cpu().numpy()
-                except:
+                except Exception as e:
+                    print(f"Error in {fname}: {e}")
                     mat_data = transforms.Resize((self.new_size, self.new_size))(
                     torch.Tensor(mat_data).unsqueeze(0)).squeeze().detach().cpu().numpy()
             mat_datas += [mat_data]
-        # try:
+
         mat_data = np.stack(mat_datas, 0)
-        # except:
-        #     pass
         return mat_data.astype('float'), label, batch, plate, fname.split('.csv')[0]
 
     def __len__(self):

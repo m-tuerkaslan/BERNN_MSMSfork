@@ -266,9 +266,11 @@ class TrainAE:
             return updated_params
 
     def make_samples_weights(self):
-        self.n_batches = len(
-            set(np.concatenate((self.data['batches']['all'], self.data['batches']['urinespositives'])))
-        )
+        self.n_batches = len(set(np.concatenate([
+            v for v in self.data['batches'].values()
+            if isinstance(v, (list, np.ndarray))
+        ])))
+
         self.class_weights = {
             label: 1 / (len(np.where(label == self.data['labels']['train'])[0]) /
                         self.data['labels']['train'].shape[0])
@@ -456,12 +458,19 @@ class TrainAE:
                 f'{self.complete_log_path}/{group}_predictions.csv')
             if self.log_neptune:
                 run[f"{group}_predictions"].track_files(f'{self.complete_log_path}/{group}_predictions.csv')
-                run[f'{group}_AUC'] = metrics.roc_auc_score(y_true=cats[group], y_score=scores[group],
+                try:
+                    run[f'{group}_AUC'] = metrics.roc_auc_score(y_true=cats[group], y_score=scores[group],
                                                             multi_class='ovr')
+                except Exception as e:
+                    print(f"Error in {group} AUC: {e}")
             if self.log_mlflow:
-                mlflow.log_metric(f'{group}_AUC',
-                                  metrics.roc_auc_score(y_true=cats[group], y_score=scores[group], multi_class='ovr'),
-                                  step=step)
+                try:
+                    mlflow.log_metric(f'{group}_AUC',
+                                      metrics.roc_auc_score(y_true=cats[group], y_score=scores[group], multi_class='ovr'),
+                                      step=step)
+                except Exception as e:
+                    print(f"Error in {group} AUC: {e}")
+
 
     def loop(self, group, optimizer, ae, celoss, loader, lists, traces, nu=1, mapping=True):
         """
@@ -906,7 +915,8 @@ class TrainAE:
             print(
                 f"Best Loss Epoch {epoch}, Losses: {np.mean(traces['rec_loss'])}, "
                 f"Domain Losses: {np.mean(traces['dom_loss'])}, "
-                f"Domain Accuracy: {np.mean(traces['dom_acc'])}")
+                f"Domain Accuracy: {np.mean(traces['dom_acc'])}"
+            )
             self.best_loss = np.mean(traces['rec_loss'])
             self.dom_loss = np.mean(traces['dom_loss'])
             self.dom_acc = np.mean(traces['dom_acc'])
@@ -963,7 +973,7 @@ class TrainAE:
         else:
             self.warmup_disc_b = False
 
-        return 1
+        return 1, ae
 
     def freeze_all_but_clayers(self, ae):
         """

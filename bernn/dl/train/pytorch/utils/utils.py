@@ -729,6 +729,8 @@ def add_to_neptune(run, values):
         if not np.isnan(values['dom_acc'][-1]):
             run["dom_acc"].log(values['dom_acc'][-1])
     for group in list(values.keys())[4:]:
+        if 'pool' in group:
+            continue
         if len(values[group]['closs']) > 0:
             if not np.isnan(values[group]['closs'][-1]):
                 run[f'/closs/{group}'].log(values[group]['closs'][-1])

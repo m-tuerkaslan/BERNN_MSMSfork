@@ -572,14 +572,14 @@ def log_neptune(run, traces):
             if len(traces['rec_loss']) > 0:
                 if not np.isnan(traces['rec_loss'][-1]):
                     try:
-                        run["rec_loss"].log(traces['rec_loss'])
+                        run["rec_loss"].log(traces['rec_loss'][-1])
                     except Exception as e:
                         print("log_neptune", e)
                         print(f"\n\n\nPROBLEM HERE:::: {traces['rec_loss']}\n\n\n")
         else:
             if not np.isnan(traces['rec_loss']):
                 try:
-                    run["rec_loss"].log(traces['rec_loss'])
+                    run["rec_loss"].log(traces['rec_loss'][-1])
                 except Exception as e:
                     print("log_neptune", e)
                     print(f"\n\n\nPROBLEM HERE:::: {traces['rec_loss']}\n\n\n")
@@ -596,14 +596,14 @@ def log_neptune(run, traces):
             if len(traces['dom_acc']) > 0:
                 if not np.isnan(traces['dom_acc'][-1]):
                     try:
-                        run["dom_acc"].log(traces['dom_acc'])
+                        run["dom_acc"].log(traces['dom_acc'][-1])
                     except Exception as e:
                         print("log_neptune", e)
                         run["dom_acc"].log(traces['dom_acc'][0])
         else:
             if not np.isnan(traces['dom_acc']):
                 try:
-                    run["dom_acc"].log(traces['dom_acc'])
+                    run["dom_acc"].log(traces['dom_acc'][-1])
                 except Exception as e:
                     print("log_neptune", e)
                     run["dom_acc"].log(traces['dom_acc'])

@@ -34,7 +34,7 @@ def get_alzheimer(path, args, seed=42):
             else:
                 skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
                 train_nums = np.arange(0, len(data['labels']['train']))
-                splitter = skf.split(train_nums, data['labels']['train']).__next__()
+                splitter = skf.split(train_nums, data['labels']['train'])
                 skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
                 train_nums_pool = np.arange(0, len(data['labels']['train_pool']))
                 pool_splitter = skf.split(train_nums_pool, data['labels']['train_pool'])
@@ -241,7 +241,7 @@ def get_amide(path, args, seed=42):
             else:
                 skf = StratifiedKFold(n_splits=3, shuffle=True, random_state=seed)
                 train_nums = np.arange(0, len(data['labels']['train']))
-                splitter = skf.split(train_nums, data['labels']['train']).__next__()
+                splitter = skf.split(train_nums, data['labels']['train'])
                 skf = StratifiedKFold(n_splits=3, shuffle=True, random_state=seed)
                 train_nums_pool = np.arange(0, len(data['labels']['train_pool']))
                 pool_splitter = skf.split(train_nums_pool, data['labels']['train_pool'])
@@ -387,7 +387,7 @@ def get_mice(path, args, seed=42):
             else:
                 skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
                 train_nums = np.arange(0, len(data['labels']['train']))
-                splitter = skf.split(train_nums, data['labels']['train']).__next__()
+                splitter = skf.split(train_nums, data['labels']['train'])
 
             _, valid_inds = splitter.__next__()
             _, test_inds = splitter.__next__()

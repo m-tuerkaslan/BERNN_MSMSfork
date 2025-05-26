@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 from bernn.dl.train.train_ae_classifier_holdout import TrainAEClassifierHoldout
 
+
 @pytest.fixture
 def sample_data():
     # Create sample dataset
@@ -12,7 +13,7 @@ def sample_data():
     n_features = 50
     n_batches = 3
     n_classes = 2
-    
+
     # Generate random data
     data = {
         'inputs': {
@@ -49,7 +50,7 @@ def sample_data():
             'all': np.array(['s' + str(x) for x in np.arange(0, n_samples)]),
             'train': np.array(['s' + str(x) for x in np.arange(0, n_samples//2)]),
             'valid': np.array(['s' + str(x) for x in np.arange(0, n_samples//4)]),
-            'test': np.array(['s' + str(x) for x in np.arange(0, n_samples//4)])         
+            'test': np.array(['s' + str(x) for x in np.arange(0, n_samples//4)])
         }
     }
     data['inputs']['all'] = pd.concat((
@@ -76,13 +77,14 @@ def sample_data():
         pd.DataFrame(data['batches']['test'].reshape(len(data['batches']['test']), 1)),
         data['inputs']['test']
     ), 1)
-    for split in ['all','train','valid','test']:
+    for split in ['all', 'train', 'valid', 'test']:
         df = data['inputs'][split]
         cols = df.columns.tolist()
-        cols[:3] = ['names','labels','batches']
+        cols[:3] = ['names', 'labels', 'batches']
         df.set_axis(cols, axis=1, inplace=True)
         print(df.columns[:5])
     return data
+
 
 @pytest.fixture
 def mock_args():
@@ -135,6 +137,7 @@ def mock_args():
 
     return Args()
 
+
 @pytest.mark.integration
 def test_training_loop(sample_data, mock_args, tmp_path):
     # Initialize trainer
@@ -153,13 +156,13 @@ def test_training_loop(sample_data, mock_args, tmp_path):
         groupkfold=True,
         pools=True
     )
-    
+
     # Set the data
     trainer.data = sample_data
     trainer.unique_labels = np.unique(sample_data['labels']['all'])
     trainer.unique_batches = np.unique(sample_data['batches']['all'])
     trainer.columns = sample_data['inputs']['all'].columns
-    
+
     # Run training with some test parameters
     params = {
         'nu': 0.001,
@@ -179,12 +182,12 @@ def test_training_loop(sample_data, mock_args, tmp_path):
         'thres': 0.0,
         'prune_threshold': 0.0
     }
-    
+
     # Write the data to a csv file
     sample_data['inputs']['all'].to_csv(trainer.path + '/mock.csv', index=False)
     # Save mock top features to tsv
     pd.DataFrame(sample_data['inputs']['all'].columns[3:]).to_csv(trainer.path + '/mock_top_features.tsv', index=False)
-    
+
     try:
         result = trainer.train(params)
         assert isinstance(result, (float, int)), "Training should return a numeric value"
@@ -192,7 +195,7 @@ def test_training_loop(sample_data, mock_args, tmp_path):
         pytest.skip(f"Training failed due to: {str(e)}")
     # Delete the csv
     os.remove(trainer.path + '/mock.csv')
-    
+
 
 @pytest.mark.integration
 @pytest.mark.slow
@@ -202,7 +205,7 @@ def test_full_training_pipeline(sample_data, mock_args, tmp_path):
     else:
         # Set CUDA device
         mock_args.device = 'cuda:0'
-    
+
     # Initialize trainer
     trainer = TrainAEClassifierHoldout(
         mock_args,
@@ -219,13 +222,13 @@ def test_full_training_pipeline(sample_data, mock_args, tmp_path):
         groupkfold=True,
         pools=True
     )
-    
+
     # Set the data
     trainer.data = sample_data
     trainer.unique_labels = np.unique(sample_data['labels']['all'])
     trainer.unique_batches = np.unique(sample_data['batches']['all'])
     trainer.columns = sample_data['inputs']['all'].columns
-    
+
     # Write the data to a csv file
     sample_data['inputs']['all'].to_csv(trainer.path + '/mock.csv', index=False)
     # Save mock top features to tsv
@@ -250,7 +253,7 @@ def test_full_training_pipeline(sample_data, mock_args, tmp_path):
         'thres': 0.0,
         'prune_threshold': 0.0
     }
-    
+
     try:
         result = trainer.train(params)
         assert isinstance(result, (float, int)), "Training should return a numeric value"
