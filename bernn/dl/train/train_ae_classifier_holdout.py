@@ -558,26 +558,15 @@ class TrainAEClassifierHoldout(TrainAE):
 
         # Logging every model is taking too much resources and it makes it quite complicated to get information when
         # Too many runs have been made. This will make the notebook so much easier to work with
-        if np.mean(best_mccs) > self.best_mcc:
-            try:
-                if os.path.exists(
-                        f'logs/best_models/ae_classifier_holdout/{self.args.dataset}/'
-                        f'{self.args.dloss}_vae{self.args.variational}'
-                ):
-                    shutil.rmtree(
-                        f'logs/best_models/ae_classifier_holdout/{self.args.dataset}/'
-                        f'{self.args.dloss}_vae{self.args.variational}',
-                        ignore_errors=True)
-                shutil.copytree(f'{self.complete_log_path}',
-                                f'logs/best_models/ae_classifier_holdout/'
-                                f'{self.args.dataset}/{self.args.dloss}_vae{self.args.variational}')
-                # print("File copied successfully.")
-
-            # If source and destination are same
-            except shutil.SameFileError:
-                # print("Source and destination represents the same file.")
-                pass
-            self.best_mcc = np.mean(best_mccs)
+        dest_dir_base = f'logs/best_models/ae_classifier_holdout/{self.args.dataset}/{self.args.dloss}_vae{self.args.variational}'
+        dest_dir = f"{dest_dir_base}/{self.foldername}"
+        os.makedirs(dest_dir_base, exist_ok=True)
+        try:
+            shutil.copytree(self.complete_log_path, dest_dir)
+        except FileExistsError:
+            shutil.rmtree(dest_dir, ignore_errors=True)
+            shutil.copytree(self.complete_log_path, dest_dir)
+        self.best_mcc = np.mean(best_mccs)
 
         # Logs confusion matrices in the background. Also runs RandomForestClassifier on encoded and reconstructed
         # representations. This should be shorter than the actual calculation of the model above in the function,
@@ -695,7 +684,7 @@ if __name__ == "__main__":
 
     train = TrainAEClassifierHoldout(args, args.path, fix_thres=-1, load_tb=False,
                                      log_metrics=args.log_metrics,
-                                     keep_models=False, log_inputs=False,
+                                     keep_models=True, log_inputs=False,
                                      log_plots=args.log_plots, log_tb=False,
                                      log_neptune=True,
                                      log_mlflow=True, groupkfold=args.groupkfold,
